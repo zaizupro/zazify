@@ -1,0 +1,55 @@
+#!/bin/bash
+
+ENCODE="base32"
+# ENCODE="md5sum | cut -d' ' -f 1" ## alternative
+DECODE="base32 -d"
+
+
+## read file line by line
+TEXT="$(cat ${1} | sed -e 's|\s\+|\n|g' | sort -u)"
+TEXT_ARRAY=($(echo $TEXT | tr " " "\n"))
+TEXT_ARRAY_NUM="$(echo $TEXT | tr " " "\n" | wc -l)"
+
+##[==========================================================================]##
+for ((i=0; i < ${TEXT_ARRAY_NUM}; i++)); do
+
+    CURRENT_LINE="${TEXT_ARRAY[$i]}"
+
+    if [ ${#CURRENT_LINE} -le 44 ];then  ## length=44 is base32 bug
+        OUT_TEXT_ARR[$i]="${CURRENT_LINE}"    ## test
+        OUT_FG_ARR[$i]="$(( RANDOM % 10))"    ## test
+        OUT_BG_ARR[$i]="$(( RANDOM % 10))"    ## test
+        CURRENT_LINE_HASH="$(echo "${CURRENT_LINE}" | ${ENCODE})"
+        # BG_KOLOR="$(( RANDOM % 8))"
+        # FG_KOLOR="$(( BG_KOLOR + 8 ))"
+        BG_KOLOR="$(( RANDOM % 250))"
+        FG_KOLOR="$(( RANDOM % 250))"
+        OUT="${OUT}${FG_KOLOR} ${BG_KOLOR} ${CURRENT_LINE_HASH} ${CURRENT_LINE}\n"
+
+        # echo "$CURRENT_LINE_HASH"  ## DEBUG
+    else
+        echo "line "$i": '"${CURRENT_LINE}"' too long("${#CURRENT_LINE}") or invalid"
+    fi
+
+done
+
+# echo -e "${OUT}" > ./dict_ext   ## DEBUG
+
+##[==========================================================================]##
+SED_CMD="sed -r "
+SED_CMD_OUT=${SED_CMD}
+
+while IFS=$'\n' read -r line || [[ -n "$line" ]]; do
+    marker="$(echo "$line"  | awk '{print $3}' | ${DECODE})"
+    fg_color="$(echo "$line"  | awk '{print $1}')"
+    bg_color="$(echo "$line"  | awk '{print $2}')"
+    SED_CMD_OUT=$(echo -e "$SED_CMD_OUT "'\\\n    -e "s/('$marker')/$(tput setaf '$fg_color')$(tput setab '$bg_color')\\1$(tput sgr 0)/g" ')
+done <<< $(echo -e "${OUT}")
+# done <<< $(cat ./dict_ext)
+
+
+##[==========================================================================]##
+echo "#!/bin/bash" > markdat_cmd
+echo "cat /dev/stdin | ${SED_CMD_OUT}" >> markdat_cmd
+chmod 777 ./markdat_cmd  ## fixdat
+
